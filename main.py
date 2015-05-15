@@ -5,6 +5,7 @@ import tempfile
 import os
 import logging
 import jinja2
+from constants import DEFAULT_HEADERS, INCLUDE_PATHS
 from pygccxml import parser
 from pygccxml.declarations import matcher
 from pygccxml.utils import loggers
@@ -12,47 +13,6 @@ loggers.cxx_parser.setLevel(logging.ERROR)
 
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
-
-DEFAULT_HEADERS = [
-    "assert.h",
-    "ctype.h",
-    "errno.h",
-    "float.h",
-    "limits.h",
-    "locale.h",
-    "math.h",
-    "setjmp.h",
-    "signal.h",
-    "stdarg.h",
-    "stddef.h",
-    "stdio.h",
-    "stdlib.h",
-    "string.h",
-    "time.h",
-    "iso646.h",
-    "wchar.h",
-    "wctype.h",
-    "complex.h",
-    "fenv.h",
-    "inttypes.h",
-    "stdbool.h",
-    "stdint.h",
-    "tgmath.h",
-    "stdalign.h",
-    "unistd.h",
-    # Don't include C11 headers for now
-    #"stdatomic.h",
-    #"stdnoreturn.h",
-    #"threads.h",
-    #"uchar.h",
-]
-
-# taken from https://gcc.gnu.org/onlinedocs/cpp/Search-Path.html
-INCLUDE_PATHS = [
-    "/usr/local/include/",
-    "/usr/target/include/",
-    "/usr/include/",
-]
 
 
 class Parser(object):
