@@ -106,6 +106,8 @@ class CCodeGenerator(CodeGenerator):
         impls = []
         include_tpl = self.env.get_template("include.tpl")
         includes = []
+        orig_cache_tpl = self.env.get_template("orig_cache.tpl")
+        orig_caches = []
         has_variadic = False
         for func in self.functions:
             typedef = typedef_tpl.render(func=func)
@@ -114,13 +116,15 @@ class CCodeGenerator(CodeGenerator):
                 impl = impl_variadic_tpl.render(func=func)
                 has_variadic = True
             else:
+                orig_cache = orig_cache_tpl.render(func=func)
+                orig_caches.append(orig_cache)
                 impl = impl_tpl.render(func=func)
             impls.append(impl)
             include = include_tpl.render(func=func)
             if include not in includes:
                 includes.append(include)
         return self.env.get_template("source.tpl").render(
-            includes=includes, typedefs=typedefs, impls=impls, has_variadic=has_variadic
+            includes=includes, typedefs=typedefs, orig_caches=orig_caches, impls=impls, has_variadic=has_variadic
         )
 
 
