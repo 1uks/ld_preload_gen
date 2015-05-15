@@ -1,12 +1,16 @@
 #!/usr/bin/env python2
 
 import argparse
-import sys
+from os import path
 import logging
+import jinja2
 from pygccxml import parser
 from pygccxml.declarations import matcher
 from pygccxml.utils import loggers
 loggers.cxx_parser.setLevel(logging.ERROR)
+
+
+BASE_DIR = path.dirname(path.realpath(__file__))
 
 
 class Parser(object):
@@ -23,20 +27,29 @@ class Parser(object):
     def _no_restrict(self, string):
         return string.replace("__restrict__", "")
 
+    def _prettify_type(self, string):
+        return self._prettify(self._remove_ns(self._no_restrict(string)))
+
     def parse_functions(self, func_names):
         for func_name in func_names:
             try:
                 func = self.ns.free_function(func_name)
             except matcher.declaration_not_found_t:
                 continue
+            if not func.required_args:
+                args = [{"name": "", "type": "void"}]
+            else:
+                args = []
+                for arg in func.required_args:
+                    args.append({
+                        "name": self._prettify(arg.name),
+                        "type": self._prettify_type(arg.type.decl_string),
+                    })
             yield {
                 "name": self._remove_ns(func.name),
                 "return_type": self._remove_ns(func.return_type.decl_string),
-                "header": func.location.file_name,
-                "args": [
-                    {"name": self._prettify(arg.name), "type": self._prettify(self._remove_ns(self._no_restrict(arg.type.decl_string)))}
-                    for arg in func.required_args
-                ]
+                "header": path.basename(func.location.file_name),
+                "args": args,
             }
 
 
@@ -52,60 +65,41 @@ class CodeGenerator(object):
 
 
 class CCodeGenerator(CodeGenerator):
-    TYPEDEF_TPL = "typedef {func[return_type]} (*orig_{func[name]}_f_type)({args});"
-    IMPL_TPL = """{func[return_type]} {func[name]}({args})
-{{
-    orig_{func[name]}_f_type orig_{func[name]} = (orig_{func[name]}_f_type) dlsym(RTLD_NEXT, "{func[name]}");
+    def __init__(self):
+        self.env = jinja2.Environment(
+            loader=jinja2.FileSystemLoader(path.join(BASE_DIR, "templates")),
+            trim_blocks=True,
+        )
+        self.env.filters["joinargs"] = self._joinargs
+        super(CCodeGenerator, self).__init__()
 
-    return orig_{func[name]}({arg_names});
-}}"""
-    IMPL_VARIADIC_TPL = """{func[return_type]} {func[name]}({args})
-{{
-    va_list args;
-    va_start(args, {last_arg});
-
-    {func[return_type]} ret = v{func[name]}({arg_names}, args);
-
-    va_end(args);
-
-    return ret;
-}}"""
-    INCLUDE_TPL = "#include <{filename}>"
-    RESULT_TPL = """#define _GNU_SOURCE
-#include <dlfcn.h>
-{includes}
-
-{typedefs}
-
-{impls}"""
-
-
-    def generate_decl(self, function):
-        pass
+    def _joinargs(self, func):
+        return ", ".join(" ".join(arg.values()) for arg in func["args"])
 
     def generate(self):
+        typedef_tpl = self.env.get_template("typedef.tpl")
         typedefs = []
+        impl_tpl = self.env.get_template("impl.tpl")
+        impl_variadic_tpl = self.env.get_template("impl_variadic.tpl")
         impls = []
+        include_tpl = self.env.get_template("include.tpl")
         includes = []
         has_variadic = False
         for func in self.functions:
-            variadic = "..." in (arg["type"] for arg in func["args"])
-            args = ", ".join("%s %s" % (arg["type"], arg["name"]) for arg in func["args"])
-            if variadic:
+            typedef = typedef_tpl.render(func=func)
+            typedefs.append(typedef)
+            if func["args"][-1]["type"] == "...":  # variadic
+                impl = impl_variadic_tpl.render(func=func)
                 has_variadic = True
-                last_arg = func["args"][-2]["name"]
-                arg_names = ", ".join(arg["name"] for arg in func["args"][:-1])
-                impl = self.IMPL_VARIADIC_TPL.format(func=func, args=args, arg_names=arg_names, last_arg=last_arg)
             else:
-                arg_names = ", ".join([arg["name"] for arg in func["args"]])
-                typedef = self.TYPEDEF_TPL.format(func=func, args=args)
-                typedefs.append(typedef)
-                impl = self.IMPL_TPL.format(func=func, args=args, arg_names=arg_names)
+                impl = impl_tpl.render(func=func)
             impls.append(impl)
-            include = self.INCLUDE_TPL.format(filename=func["header"])
+            include = include_tpl.render(func=func)
             if include not in includes:
                 includes.append(include)
-        return self.RESULT_TPL.format(includes="\n".join(includes), typedefs="\n".join(typedefs), impls="\n\n".join(impls))
+        return self.env.get_template("source.tpl").render(
+            includes=includes, typedefs=typedefs, impls=impls, has_variadic=has_variadic
+        )
 
 
 class RustCodeGenerator(CodeGenerator):
