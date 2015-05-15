@@ -1,4 +1,4 @@
-{{func.return_type}} {{func.name}}({{func|joinargs|trim}})
+{{func.return_type}} {{func.name}}({{func|joinargs}})
 {
     va_list args;
     va_start(args, {{func.args[-2].name}});

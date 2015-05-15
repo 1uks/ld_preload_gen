@@ -96,7 +96,7 @@ class CCodeGenerator(CodeGenerator):
         super(CCodeGenerator, self).__init__()
 
     def _joinargs(self, func):
-        return ", ".join(" ".join(arg.values()) for arg in func["args"])
+        return ", ".join(" ".join(arg.values()) for arg in func["args"]).strip()
 
     def generate(self):
         typedef_tpl = self.env.get_template("typedef.tpl")
