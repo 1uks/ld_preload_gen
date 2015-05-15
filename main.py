@@ -32,6 +32,15 @@ class Parser(object):
     def _prettify_type(self, string):
         return self._prettify(self._remove_ns(self._no_restrict(string)))
 
+    def _is_struct(self, type):
+        while hasattr(type, "base"):
+            type = type.base
+        if hasattr(type, "declaration"):
+            if hasattr(type.declaration, "class_type"):
+                if type.declaration.class_type == "struct":
+                    return True
+        return False
+
     def yield_functions(self, func_names):
         for func_name in func_names:
             try:
@@ -43,18 +52,24 @@ class Parser(object):
             else:
                 args = []
                 for arg in func.required_args:
+                    type = self._prettify_type(arg.type.decl_string)
+                    if self._is_struct(arg.type):
+                        type = "struct " + type
                     args.append({
                         "name": self._prettify(arg.name),
-                        "type": self._prettify_type(arg.type.decl_string),
+                        "type": type,
                     })
             header = func.location.file_name
             for path in INCLUDE_PATHS:  # refactor
                 if func.location.file_name.startswith(path):
                     header = header.rsplit(path)[1]
                     break
+            return_type = self._remove_ns(func.return_type.decl_string)
+            if self._is_struct(func.return_type):
+                return_type = "struct " + return_type
             yield {
                 "name": self._remove_ns(func.name),
-                "return_type": self._remove_ns(func.return_type.decl_string),
+                "return_type": return_type,
                 "header": header,
                 "args": args,
             }
