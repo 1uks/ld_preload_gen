@@ -1,7 +1,8 @@
 #!/usr/bin/env python2
 
 import argparse
-from os import path
+import tempfile
+import os
 import logging
 import jinja2
 from pygccxml import parser
@@ -10,7 +11,48 @@ from pygccxml.utils import loggers
 loggers.cxx_parser.setLevel(logging.ERROR)
 
 
-BASE_DIR = path.dirname(path.realpath(__file__))
+BASE_DIR = os.path.dirname(os.path.realpath(__file__))
+
+DEFAULT_HEADERS = [
+    "assert.h",
+    "ctype.h",
+    "errno.h",
+    "float.h",
+    "limits.h",
+    "locale.h",
+    "math.h",
+    "setjmp.h",
+    "signal.h",
+    "stdarg.h",
+    "stddef.h",
+    "stdio.h",
+    "stdlib.h",
+    "string.h",
+    "time.h",
+    "iso646.h",
+    "wchar.h",
+    "wctype.h",
+    "complex.h",
+    "fenv.h",
+    "inttypes.h",
+    "stdbool.h",
+    "stdint.h",
+    "tgmath.h",
+    "stdalign.h",
+    "unistd.h",
+    # Don't include C11 headers for now
+    #"stdatomic.h",
+    #"stdnoreturn.h",
+    #"threads.h",
+    #"uchar.h",
+]
+
+# taken from https://gcc.gnu.org/onlinedocs/cpp/Search-Path.html
+INCLUDE_PATHS = [
+    "/usr/local/include/",
+    "/usr/target/include/",
+    "/usr/include/",
+]
 
 
 class Parser(object):
@@ -30,7 +72,7 @@ class Parser(object):
     def _prettify_type(self, string):
         return self._prettify(self._remove_ns(self._no_restrict(string)))
 
-    def parse_functions(self, func_names):
+    def yield_functions(self, func_names):
         for func_name in func_names:
             try:
                 func = self.ns.free_function(func_name)
@@ -45,10 +87,15 @@ class Parser(object):
                         "name": self._prettify(arg.name),
                         "type": self._prettify_type(arg.type.decl_string),
                     })
+            header = func.location.file_name
+            for path in INCLUDE_PATHS:  # refactor
+                if func.location.file_name.startswith(path):
+                    header = header.rsplit(path)[1]
+                    break
             yield {
                 "name": self._remove_ns(func.name),
                 "return_type": self._remove_ns(func.return_type.decl_string),
-                "header": path.basename(func.location.file_name),
+                "header": header,
                 "args": args,
             }
 
@@ -67,7 +114,7 @@ class CodeGenerator(object):
 class CCodeGenerator(CodeGenerator):
     def __init__(self):
         self.env = jinja2.Environment(
-            loader=jinja2.FileSystemLoader(path.join(BASE_DIR, "templates")),
+            loader=jinja2.FileSystemLoader(os.path.join(BASE_DIR, "templates")),
             trim_blocks=True,
         )
         self.env.filters["joinargs"] = self._joinargs
@@ -106,18 +153,24 @@ class RustCodeGenerator(CodeGenerator):
     pass
 
 
-
-def main(filename, funcs):
-    parser = Parser(filename)
+def main(headers, funcs):
+    fd, tmpfile = tempfile.mkstemp(suffix=".h")
+    with os.fdopen(fd, "w") as fileobj:
+        fileobj.write("\n".join("#include <%s>" % header for header in headers))
+    try:
+        parser = Parser(tmpfile)
+    finally:
+        os.unlink(tmpfile)
     generator = CCodeGenerator()
-    for func in parser.parse_functions(funcs):
+    for func in parser.yield_functions(funcs):
         generator.add_function(func)
     print generator.generate()
 
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
-    argparser.add_argument("filename")
+    argparser.add_argument("-H", "--header", nargs="*", dest="headers",
+        default=DEFAULT_HEADERS)
     argparser.add_argument("func", nargs="+")
     args = argparser.parse_args()
-    main(args.filename, args.func)
+    main(args.headers, args.func)
