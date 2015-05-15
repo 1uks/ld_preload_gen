@@ -6,7 +6,9 @@
 {{ includes|join("\n") }}
 
 {{ typedefs|join("\n") }}
+{% if orig_caches %}
 
-{{ orig_caches|join("\n") }}
+{{ orig_caches|join("\n\n") }}
+{% endif %}
 
 {{ impls|join("\n\n") }}
