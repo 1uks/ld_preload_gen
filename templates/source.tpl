@@ -7,4 +7,6 @@
 
 {{ typedefs|join("\n") }}
 
+{{ orig_caches|join("\n") }}
+
 {{ impls|join("\n\n") }}
