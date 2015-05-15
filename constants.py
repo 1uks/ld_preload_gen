@@ -1,4 +1,4 @@
-C_STANDARD_HEADERS = [
+C89_HEADERS = [
     "assert.h",
     "ctype.h",
     "errno.h",
@@ -14,9 +14,15 @@ C_STANDARD_HEADERS = [
     "stdlib.h",
     "string.h",
     "time.h",
+]
+
+C95_HEADERS = [
     "iso646.h",
     "wchar.h",
     "wctype.h",
+]
+
+C99_HEADERS = [
     "complex.h",
     "fenv.h",
     "inttypes.h",
@@ -24,12 +30,16 @@ C_STANDARD_HEADERS = [
     "stdint.h",
     "tgmath.h",
     "stdalign.h",
-    # Don't include C11 headers for now
-    #"stdatomic.h",
-    #"stdnoreturn.h",
-    #"threads.h",
-    #"uchar.h",
 ]
+
+# not yet in use
+C11_HEADERS = [
+    "stdatomic.h",
+    "stdnoreturn.h",
+    "threads.h",
+    "uchar.h",
+]
+
 
 POSIX_HEADERS = [
     "aio.h",
@@ -92,7 +102,9 @@ POSIX_HEADERS = [
     "wordexp.h",
 ]
 
-DEFAULT_HEADERS = C_STANDARD_HEADERS + POSIX_HEADERS
+
+DEFAULT_HEADERS = C89_HEADERS + C95_HEADERS + C99_HEADERS + POSIX_HEADERS
+
 
 # taken from https://gcc.gnu.org/onlinedocs/cpp/Search-Path.html
 INCLUDE_PATHS = [
