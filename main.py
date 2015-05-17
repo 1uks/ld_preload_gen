@@ -127,7 +127,8 @@ class CCodeGenerator(CodeGenerator):
             if include not in includes:
                 includes.append(include)
         return self.env.get_template("source.tpl").render(
-            includes=includes, typedefs=typedefs, orig_caches=orig_caches, impls=impls, has_variadic=has_variadic
+            includes=includes, typedefs=typedefs, orig_caches=orig_caches,
+            impls=impls, has_variadic=has_variadic
         )
 
     def save_to_dir(self, directory, library_name=None):
@@ -142,7 +143,9 @@ class CCodeGenerator(CodeGenerator):
         print filename
         with open(filename, "w") as outfile:
             outfile.write(
-                self.env.get_template("makefile.tpl").render(library_name=library_name)
+                self.env.get_template("makefile.tpl").render(
+                    library_name=library_name
+                )
             )
 
 
