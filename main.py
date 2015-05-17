@@ -85,6 +85,9 @@ class CodeGenerator(object):
     def generate(self):
         raise NotImplementedError
 
+    def save_to_dir(self):
+        raise NotImplementedError
+
 
 class CCodeGenerator(CodeGenerator):
     def __init__(self):
@@ -127,12 +130,27 @@ class CCodeGenerator(CodeGenerator):
             includes=includes, typedefs=typedefs, orig_caches=orig_caches, impls=impls, has_variadic=has_variadic
         )
 
+    def save_to_dir(self, directory, library_name=None):
+        library_name = library_name or "library"
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        filename = os.path.join(directory, library_name + ".c")
+        print filename
+        with open(filename, "w") as outfile:
+            outfile.write(self.generate())
+        filename = os.path.join(directory, "Makefile")
+        print filename
+        with open(filename, "w") as outfile:
+            outfile.write(
+                self.env.get_template("makefile.tpl").render(library_name=library_name)
+            )
+
 
 class RustCodeGenerator(CodeGenerator):
     pass
 
 
-def main(headers, funcs):
+def main(headers, funcs, outdir=None, library_name=None):
     fd, tmpfile = tempfile.mkstemp(suffix=".h")
     with os.fdopen(fd, "w") as fileobj:
         fileobj.write("\n".join("#include <%s>" % header for header in headers))
@@ -143,13 +161,18 @@ def main(headers, funcs):
     generator = CCodeGenerator()
     for func in parser.yield_functions(funcs):
         generator.add_function(func)
-    print generator.generate()
+    if outdir is None:
+        print generator.generate()
+    else:
+        generator.save_to_dir(outdir, library_name)
 
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
     argparser.add_argument("-H", "--header", nargs="*", dest="headers",
         default=DEFAULT_HEADERS)
+    argparser.add_argument("-o", "--outdir")
+    argparser.add_argument("-l", "--library-name")
     argparser.add_argument("func", nargs="+")
     args = argparser.parse_args()
-    main(args.headers, args.func)
+    main(args.headers, args.func, args.outdir, args.library_name)
