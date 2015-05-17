@@ -85,7 +85,7 @@ class CodeGenerator(object):
     def generate(self):
         raise NotImplementedError
 
-    def save_to_dir(self):
+    def save_to_dir(self, directory, library_name=None):
         raise NotImplementedError
 
 
